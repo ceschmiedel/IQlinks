@@ -53,9 +53,10 @@ desabilitado — sem API aberta de afiliados — e a mensagem sai marcada com
 
 ### GitHub Pages (modo estático)
 
-O push na branch principal aciona `.github/workflows/pages.yml`, que publica
-o frontend no GitHub Pages (Settings → Pages → Source: **GitHub Actions**,
-habilitado automaticamente pelo workflow na primeira execução).
+O push na branch principal aciona `.github/workflows/pages.yml`, que monta
+o site e o publica na branch `gh-pages` — em repositório público o GitHub
+habilita o Pages automaticamente para essa branch. O site fica em
+`https://<usuario>.github.io/IQlinks/`.
 
 Como o Pages não roda o servidor Node, a página detecta a ausência do
 backend e entra em **modo estático**, importando os mesmos módulos ES de
