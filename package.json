@@ -1,0 +1,15 @@
+{
+  "name": "iqlinks",
+  "version": "0.1.0",
+  "description": "Seleciona ofertas de afiliados com maior potencial de venda (Shopee, Mercado Livre) e formata/envia para grupos.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "start": "node --no-warnings src/index.js",
+    "demo": "node --no-warnings src/index.js --source mock --dispatch console",
+    "test": "node --no-warnings --test"
+  },
+  "license": "MIT"
+}
