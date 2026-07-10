@@ -4,25 +4,7 @@ import { rankOffers } from './score.js';
 import { SentStore } from './store.js';
 import { formatOfferMessage } from './format.js';
 import { createDispatcher } from './dispatch/index.js';
-import { ShopeeSource } from './sources/shopee.js';
-import { MercadoLivreSource } from './sources/mercadolivre.js';
-import { MockSource } from './sources/mock.js';
-
-function createSource(name) {
-  switch (name) {
-    case 'shopee':
-      return new ShopeeSource(config.shopee);
-    case 'mercadolivre':
-    case 'meli':
-      return new MercadoLivreSource(config.meli);
-    case 'mock':
-      return new MockSource();
-    default:
-      throw new Error(
-        `Fonte desconhecida: "${name}" (use "shopee", "mercadolivre" ou "mock").`,
-      );
-  }
-}
+import { createSource } from './sources/index.js';
 
 async function main() {
   const { values: args } = parseArgs({

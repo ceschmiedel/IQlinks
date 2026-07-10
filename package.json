@@ -8,6 +8,7 @@
   },
   "scripts": {
     "start": "node --no-warnings src/index.js",
+    "web": "node --no-warnings src/server.js",
     "demo": "node --no-warnings src/index.js --source mock --dispatch console",
     "test": "node --no-warnings --test"
   },

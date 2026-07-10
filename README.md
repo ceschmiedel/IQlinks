@@ -7,11 +7,13 @@ npm — só Node.js 22.5+ (fetch, crypto e SQLite embutidos).
 ## Rodando agora (sem credenciais)
 
 ```bash
-npm run demo
+npm run web    # interface web em http://localhost:3000
+npm run demo   # mesma coisa via CLI
 ```
 
-Roda o pipeline completo com dados de exemplo: ranking → dedupe → mensagem
-formatada pronta para colar no grupo.
+Na interface web, use a fonte **Demo** para rodar o fluxo completo sem
+credenciais: buscar → ranquear → selecionar → gerar shortlink → compartilhar.
+O CLI roda o mesmo pipeline e imprime as mensagens no terminal.
 
 ```bash
 npm test          # testes do ranking, dedupe e formatação
@@ -27,6 +29,36 @@ fontes (Shopee / Mercado Livre / mock)
    → formatação da mensagem
    → disparo (console = semiautomático | telegram = Bot API oficial)
 ```
+
+O mesmo pipeline é acessível de duas formas: **CLI** (`src/index.js`, para
+cron) e **interface web** (`src/server.js` + `public/`, para uso manual).
+
+### Interface web
+
+`npm run web` sobe o servidor em `http://localhost:3000` (mude com `PORT`).
+O usuário busca ofertas por fonte/palavra-chave, vê os cards ordenados por
+potencial de venda (com comissão, desconto, vendas e avaliação), seleciona
+as que quer divulgar e:
+
+- **📋 Copiar** — copia as mensagens formatadas para colar no grupo;
+- **🟢 WhatsApp** — abre o WhatsApp via `wa.me` com a mensagem pronta, e o
+  usuário só escolhe o grupo (semiautomático, zero risco de ban);
+- **✈️ Telegram** — envia direto ao grupo pela Bot API oficial.
+
+Cards da Shopee têm o botão **Gerar shortlink** (com o Sub-ID da toolbar
+para atribuição por grupo/campanha). No Mercado Livre o botão fica
+desabilitado — sem API aberta de afiliados — e a mensagem sai marcada com
+"link comum". Tudo que foi copiado/enviado alimenta o dedupe e aparece como
+"já enviado" nas próximas buscas.
+
+API JSON usada pela página (útil para integrar outra UI):
+
+| Rota | Função |
+|---|---|
+| `GET /api/offers?source&keyword&limit` | coleta + ranking, mensagens prontas e flag de dedupe |
+| `POST /api/shortlink` | `{source, originUrl, subIds}` → shortlink Shopee |
+| `POST /api/share/telegram` | `{offers}` → envia via Bot API e marca no dedupe |
+| `POST /api/mark-sent` | `{offers}` → alimenta o dedupe no fluxo semiautomático |
 
 ### Score de potencial de venda
 
@@ -99,14 +131,18 @@ Para rodar recorrente, agende no cron:
 ## Estrutura
 
 ```
+public/
+  index.html            # interface web (vanilla JS, sem build)
 src/
   index.js              # CLI / orquestração do pipeline
+  server.js             # servidor HTTP + API JSON da interface web
   config.js             # .env → config tipada
   offer.js              # formato normalizado de oferta
   score.js              # ranking de potencial de venda
   store.js              # dedupe em SQLite (node:sqlite)
   format.js             # mensagem formatada (WhatsApp/Telegram)
   sources/
+    index.js            # fábrica das fontes (CLI e web)
     shopee.js           # Shopee Affiliate Open API (GraphQL + assinatura)
     mercadolivre.js     # API pública de busca do ML
     mock.js             # dados de exemplo para o demo
