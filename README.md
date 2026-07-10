@@ -4,19 +4,102 @@ Protótipo que **coleta ofertas de marketplaces, ranqueia por potencial de
 venda e formata/envia os links de afiliado** para grupos. Zero dependências
 npm — só Node.js 22.5+ (fetch, crypto e SQLite embutidos).
 
-## Rodando agora (sem credenciais)
+## Como rodar no seu computador (passo a passo)
+
+Guia para quem nunca rodou um projeto assim. Só é preciso instalar **uma**
+coisa (o Node.js) — o projeto não tem nenhuma outra dependência.
+
+### 1. Instale o Node.js
+
+1. Acesse <https://nodejs.org>.
+2. Baixe a versão **LTS** (o botão verde em destaque). Precisa ser a
+   **22.5 ou mais nova**.
+3. Instale normalmente (avançar → avançar → concluir no Windows; arrastar
+   para Aplicativos no macOS).
+4. Confira se deu certo: abra o terminal e digite `node --version` e
+   aperte Enter. Deve aparecer algo como `v22.x.x`.
+   - **Windows:** menu Iniciar → digite `PowerShell` → Enter.
+   - **macOS:** Cmd + Espaço → digite `Terminal` → Enter.
+
+### 2. Baixe o projeto
+
+- **Sem instalar nada (mais fácil):** na página do projeto no GitHub,
+  clique no botão verde **Code → Download ZIP**. Extraia o ZIP em uma
+  pasta fácil de achar (ex.: Área de Trabalho). A pasta extraída deve
+  conter `package.json`, `src`, `public` etc.
+- **Ou, se já usa git:**
+  ```bash
+  git clone https://github.com/ceschmiedel/IQlinks.git
+  ```
+
+### 3. Abra o terminal dentro da pasta do projeto
+
+- **Windows:** abra a pasta do projeto no Explorador de Arquivos, clique
+  na **barra de endereço** (onde aparece o caminho), digite `powershell`
+  e aperte Enter — o terminal abre já dentro da pasta.
+- **macOS:** abra o Terminal, digite `cd ` (com um espaço depois),
+  **arraste a pasta do projeto** para a janela do Terminal e aperte Enter.
+
+Para conferir que está na pasta certa, digite `ls` (macOS/Linux) ou `dir`
+(Windows): a lista deve mostrar `package.json`, `src` e `public`.
+
+### 4. Inicie a aplicação
+
+```bash
+npm run web
+```
+
+Vai aparecer a mensagem:
+
+```
+IQlinks web rodando em http://localhost:3000
+```
+
+Deixe essa janela do terminal aberta — é ela que mantém a aplicação no ar.
+
+### 5. Use no navegador
+
+Abra <http://localhost:3000> no seu navegador. Para testar sem configurar
+nada, deixe a fonte em **Demo (sem credenciais)** e clique em **Buscar
+ofertas**: dá para selecionar os cards, gerar shortlink, copiar as
+mensagens e compartilhar no WhatsApp/Telegram com dados de exemplo.
+
+### 6. Para parar e rodar de novo
+
+- **Parar:** clique na janela do terminal e aperte `Ctrl + C`.
+- **Rodar de novo:** repita os passos 3 e 4. A instalação (passos 1 e 2)
+  só é necessária na primeira vez.
+
+### 7. (Opcional) Configurar credenciais reais
+
+Para usar a Shopee de verdade ou enviar ao Telegram, crie o arquivo de
+configuração copiando o modelo:
+
+```bash
+copy .env.example .env    # Windows (PowerShell)
+cp .env.example .env      # macOS / Linux
+```
+
+Abra o arquivo `.env` no Bloco de Notas (ou TextEdit) e preencha o que
+tiver — as seções [Fontes](#fontes) e [Disparo](#disparo--por-que-não-há-whatsapp-automático)
+abaixo explicam onde conseguir cada credencial. Depois pare e inicie a
+aplicação de novo (passo 6) para ela ler o arquivo.
+
+### Problemas comuns
+
+| Sintoma | O que fazer |
+|---|---|
+| `'node' não é reconhecido...` / `command not found` | O Node não foi instalado, ou o terminal foi aberto antes da instalação. Feche o terminal, abra de novo e repita. Se persistir, reinstale o Node. |
+| `node --version` mostra versão menor que 22.5 | Baixe a LTS atual em <https://nodejs.org> e instale por cima. |
+| Erro com `EADDRINUSE` ao iniciar | Outra coisa já usa a porta 3000. Inicie em outra porta — macOS/Linux: `PORT=3001 npm run web`; Windows (PowerShell): `$env:PORT=3001; npm run web` — e abra `http://localhost:3001`. |
+| A fonte Mercado Livre dá erro | Sem internet ou a API pública do ML está indisponível no momento. Teste com a fonte **Demo** para confirmar que a aplicação em si está OK. |
+
+### Atalhos para quem já usa terminal
 
 ```bash
 npm run web    # interface web em http://localhost:3000
-npm run demo   # mesma coisa via CLI
-```
-
-Na interface web, use a fonte **Demo** para rodar o fluxo completo sem
-credenciais: buscar → ranquear → selecionar → gerar shortlink → compartilhar.
-O CLI roda o mesmo pipeline e imprime as mensagens no terminal.
-
-```bash
-npm test          # testes do ranking, dedupe e formatação
+npm run demo   # mesmo pipeline via CLI, com dados de exemplo
+npm test       # testes do ranking, dedupe e formatação
 node src/index.js --help
 ```
 
@@ -51,28 +134,16 @@ desabilitado — sem API aberta de afiliados — e a mensagem sai marcada com
 "link comum". Tudo que foi copiado/enviado alimenta o dedupe e aparece como
 "já enviado" nas próximas buscas.
 
-### GitHub Pages (modo estático)
+### Hospedagem estática (opcional)
 
-O push na branch principal aciona `.github/workflows/pages.yml`, que monta
-o site e o publica na branch `gh-pages` — em repositório público o GitHub
-habilita o Pages automaticamente para essa branch. O site fica em
-`https://<usuario>.github.io/IQlinks/`.
-
-Como o Pages não roda o servidor Node, a página detecta a ausência do
-backend e entra em **modo estático**, importando os mesmos módulos ES de
-`src/` direto no navegador:
-
-- **Demo** e **Mercado Livre** funcionam (a busca do ML é chamada do
-  navegador; depende do CORS da API pública);
-- **dedupe** vai para `localStorage` em vez de SQLite;
-- **Telegram** pede token e chat ID do bot na primeira vez e salva só no
-  navegador — ciente de que o token fica exposto a quem usar aquele
-  navegador; para uso sério, prefira o modo servidor;
-- **Copiar / WhatsApp** funcionam integralmente (são client-side por design);
-- **Shopee e shortlinks reais ficam indisponíveis**: exigem o App Secret,
-  que não pode ser embutido em página pública. Para testes reais com a
-  Shopee, rode `npm run web` localmente ou hospede o servidor Node em um
-  host com backend (Render, Railway, Fly.io, VPS).
+A mesma página também funciona hospedada como site estático, sem o
+servidor Node: ela detecta a ausência do backend e entra em **modo
+estático**, rodando tudo no navegador — Demo e Mercado Livre funcionam,
+o dedupe vai para `localStorage`, Copiar/WhatsApp seguem integrais e o
+Telegram pede token/chat ID do bot (salvos só naquele navegador). Shopee
+e shortlinks reais ficam indisponíveis nesse modo, porque exigem o App
+Secret do lado do servidor. Para publicar, basta servir `public/index.html`
+junto com os módulos browser-safe de `src/` em qualquer host estático.
 
 API JSON usada pela página (útil para integrar outra UI):
 
