@@ -185,13 +185,154 @@
 
 <div id="toast"></div>
 
-<script>
+<script type="module">
 const $ = (id) => document.getElementById(id);
 const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 const int = new Intl.NumberFormat('pt-BR');
 
 let offers = [];
 const selected = new Set(); // itemIds
+
+// ---- Modo de execução -------------------------------------------------
+// server: backend Node presente (npm run web) — ranking/links no servidor.
+// static: hospedagem estática (GitHub Pages) — tudo roda no navegador,
+//         importando os mesmos módulos ES de src/ e usando localStorage
+//         para o dedupe. Shopee fica indisponível: o App Secret não pode
+//         ser exposto no cliente.
+let mode = 'server';
+let lib = null;
+const WEIGHTS = { commission: 0.4, sales: 0.3, discount: 0.2, rating: 0.1 };
+const DEDUPE_DAYS = 7;
+
+async function detectMode() {
+  try {
+    const r = await fetch('api/offers?source=mock&limit=1');
+    if (r.ok && (r.headers.get('content-type') || '').includes('json')) return 'server';
+  } catch {}
+  return 'static';
+}
+
+async function loadLib() {
+  if (lib) return lib;
+  const [score, format, mock, meli, tg] = await Promise.all([
+    import('./src/score.js'),
+    import('./src/format.js'),
+    import('./src/sources/mock.js'),
+    import('./src/sources/mercadolivre.js'),
+    import('./src/dispatch/telegram.js'),
+  ]);
+  lib = {
+    rankOffers: score.rankOffers,
+    formatOfferMessage: format.formatOfferMessage,
+    MockSource: mock.MockSource,
+    MercadoLivreSource: meli.MercadoLivreSource,
+    TelegramDispatcher: tg.TelegramDispatcher,
+  };
+  return lib;
+}
+
+// Dedupe local do modo estático
+const SENT_KEY = 'iqlinks-sent';
+const sentMap = () => JSON.parse(localStorage.getItem(SENT_KEY) || '{}');
+const wasSentLocal = (o) => {
+  const t = sentMap()[`${o.source}:${o.itemId}`];
+  return Boolean(t && Date.now() - t < DEDUPE_DAYS * 864e5);
+};
+function markSentLocal(list) {
+  const m = sentMap();
+  for (const o of list) m[`${o.source}:${o.itemId}`] = Date.now();
+  localStorage.setItem(SENT_KEY, JSON.stringify(m));
+}
+
+function getTelegramConfig() {
+  let cfg = null;
+  try { cfg = JSON.parse(localStorage.getItem('iqlinks-tg')); } catch {}
+  if (cfg?.botToken && cfg?.chatId) return cfg;
+  const botToken = prompt('Token do bot do Telegram (fica salvo apenas neste navegador):');
+  if (!botToken) return null;
+  const chatId = prompt('Chat ID do grupo/canal (ex.: -1001234567890):');
+  if (!chatId) return null;
+  cfg = { botToken: botToken.trim(), chatId: chatId.trim() };
+  localStorage.setItem('iqlinks-tg', JSON.stringify(cfg));
+  return cfg;
+}
+
+const backend = {
+  async offers(params) {
+    if (mode === 'server') return api(`api/offers?${params}`);
+    const { rankOffers, formatOfferMessage, MockSource, MercadoLivreSource } = await loadLib();
+    const name = params.get('source');
+    if (name === 'shopee') {
+      throw new Error('A fonte Shopee exige o servidor (npm run web): o App Secret não pode ficar no navegador.');
+    }
+    const source = name === 'mercadolivre'
+      ? new MercadoLivreSource({ site: 'MLB' })
+      : new MockSource();
+    let found;
+    try {
+      found = await source.fetchOffers({
+        keyword: params.get('keyword'),
+        limit: Number(params.get('limit')) || 50,
+      });
+    } catch (err) {
+      if (name === 'mercadolivre') {
+        throw new Error(`Mercado Livre não respondeu no navegador (possível bloqueio de CORS) — use o servidor local para esta fonte. Detalhe: ${err.message}`);
+      }
+      throw err;
+    }
+    const ranked = rankOffers(found, WEIGHTS);
+    return {
+      offers: ranked.map((o) => ({
+        ...o,
+        message: formatOfferMessage(o),
+        sentRecently: wasSentLocal(o),
+      })),
+      dedupeDays: DEDUPE_DAYS,
+    };
+  },
+
+  async shortlink(o, subIds) {
+    if (mode === 'server') {
+      return api('api/shortlink', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: o.source, originUrl: o.link, subIds }),
+      });
+    }
+    if (o.source === 'mock') {
+      return { shortLink: `https://s.shopee.com.br/demo-${Math.random().toString(36).slice(2, 9)}` };
+    }
+    throw new Error('Shortlink da Shopee exige o servidor (npm run web).');
+  },
+
+  async shareTelegram(list) {
+    if (mode === 'server') {
+      return api('api/share/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offers: list }),
+      });
+    }
+    const { TelegramDispatcher, formatOfferMessage } = await loadLib();
+    const cfg = getTelegramConfig();
+    if (!cfg) throw new Error('Envio cancelado: informe token e chat ID do bot.');
+    const dispatcher = new TelegramDispatcher(cfg);
+    await dispatcher.send(list.map(formatOfferMessage));
+    return { sent: list.length };
+  },
+
+  async markSent(list) {
+    if (mode === 'server') {
+      return api('api/mark-sent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ offers: list }),
+      });
+    }
+    markSentLocal(list);
+    return { marked: list.length };
+  },
+};
 
 function toast(msg, isError = false) {
   const el = $('toast');
@@ -219,7 +360,7 @@ async function search() {
       keyword: $('keyword').value,
       limit: $('limit').value,
     });
-    const data = await api(`/api/offers?${params}`);
+    const data = await backend.offers(params);
     offers = data.offers;
     $('status').textContent =
       `${offers.length} ofertas, ordenadas por potencial de venda. ` +
@@ -310,11 +451,7 @@ function render() {
       btn.disabled = true;
       try {
         const subId = $('subid').value.trim();
-        const data = await api('/api/shortlink', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ source: o.source, originUrl: o.link, subIds: subId ? [subId] : [] }),
-        });
+        const data = await backend.shortlink(o, subId ? [subId] : []);
         o.message = o.message.replaceAll(o.link, data.shortLink);
         o.link = data.shortLink;
         o.isAffiliateLink = true;
@@ -353,11 +490,7 @@ function updateBar() {
 async function markSent() {
   const sent = selectedOffers();
   try {
-    await api('/api/mark-sent', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offers: sent }),
-    });
+    await backend.markSent(sent);
     for (const o of sent) o.sentRecently = true;
     selected.clear();
     render();
@@ -395,11 +528,7 @@ $('telegram').addEventListener('click', async () => {
   const btn = $('telegram');
   btn.disabled = true;
   try {
-    const data = await api('/api/share/telegram', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offers: selectedOffers() }),
-    });
+    const data = await backend.shareTelegram(selectedOffers());
     toast(`${data.sent} mensagem(ns) enviadas ao Telegram.`);
     await markSent();
   } catch (err) {
@@ -408,6 +537,16 @@ $('telegram').addEventListener('click', async () => {
     btn.disabled = false;
   }
 });
+
+mode = await detectMode();
+if (mode === 'static') {
+  $('status').textContent =
+    'Modo estático (hospedagem sem backend): fontes Demo e Mercado Livre rodam no navegador. ' +
+    'Shopee e shortlinks reais exigem o servidor (npm run web).';
+  const opt = $('source').querySelector('option[value=shopee]');
+  opt.disabled = true;
+  opt.textContent = 'Shopee (requer servidor)';
+}
 </script>
 </body>
 </html>

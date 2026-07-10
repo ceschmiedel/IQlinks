@@ -51,6 +51,28 @@ desabilitado — sem API aberta de afiliados — e a mensagem sai marcada com
 "link comum". Tudo que foi copiado/enviado alimenta o dedupe e aparece como
 "já enviado" nas próximas buscas.
 
+### GitHub Pages (modo estático)
+
+O push na branch principal aciona `.github/workflows/pages.yml`, que publica
+o frontend no GitHub Pages (Settings → Pages → Source: **GitHub Actions**,
+habilitado automaticamente pelo workflow na primeira execução).
+
+Como o Pages não roda o servidor Node, a página detecta a ausência do
+backend e entra em **modo estático**, importando os mesmos módulos ES de
+`src/` direto no navegador:
+
+- **Demo** e **Mercado Livre** funcionam (a busca do ML é chamada do
+  navegador; depende do CORS da API pública);
+- **dedupe** vai para `localStorage` em vez de SQLite;
+- **Telegram** pede token e chat ID do bot na primeira vez e salva só no
+  navegador — ciente de que o token fica exposto a quem usar aquele
+  navegador; para uso sério, prefira o modo servidor;
+- **Copiar / WhatsApp** funcionam integralmente (são client-side por design);
+- **Shopee e shortlinks reais ficam indisponíveis**: exigem o App Secret,
+  que não pode ser embutido em página pública. Para testes reais com a
+  Shopee, rode `npm run web` localmente ou hospede o servidor Node em um
+  host com backend (Render, Railway, Fly.io, VPS).
+
 API JSON usada pela página (útil para integrar outra UI):
 
 | Rota | Função |

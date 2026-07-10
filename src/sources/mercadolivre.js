@@ -23,7 +23,7 @@ export class MercadoLivreSource {
     const url = new URL(
       `https://api.mercadolibre.com/sites/${this.cfg.site}/search`,
     );
-    url.searchParams.set('q', keyword);
+    url.searchParams.set('q', keyword || 'ofertas');
     url.searchParams.set('limit', String(Math.min(limit, 50)));
 
     const headers = {};

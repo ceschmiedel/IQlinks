@@ -1,0 +1,49 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - claude/affiliate-marketplace-scraper-sqrg09
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # O site é o frontend + os módulos ES compartilhados que o modo
+      # estático importa no navegador (ranking, formatação, fontes sem
+      # segredo). Nada de src/server.js, shopee.js ou store.js: esses
+      # dependem de Node/segredos e só existem no modo servidor.
+      - name: Montar site estático
+        run: |
+          mkdir -p _site/src/sources _site/src/dispatch
+          cp public/index.html _site/
+          cp src/offer.js src/score.js src/format.js _site/src/
+          cp src/sources/mock.js src/sources/mercadolivre.js _site/src/sources/
+          cp src/dispatch/telegram.js _site/src/dispatch/
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
