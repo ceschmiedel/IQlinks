@@ -72,18 +72,30 @@ mensagens e compartilhar no WhatsApp/Telegram com dados de exemplo.
 
 ### 7. (Opcional) Configurar credenciais reais
 
-Para usar a Shopee de verdade ou enviar ao Telegram, crie o arquivo de
-configuração copiando o modelo:
+Para usar a Shopee de verdade ou enviar ao Telegram, não precisa editar
+nenhum arquivo: clique em **⚙️ Configurações** no canto superior direito
+da página. Um painel abre com os campos:
 
-```bash
-copy .env.example .env    # Windows (PowerShell)
-cp .env.example .env      # macOS / Linux
-```
+- **Shopee** — App ID e App Secret (veja como conseguir na seção
+  [Fontes](#fontes));
+- **Mercado Livre** — Access Token, opcional (não é necessário para
+  buscar ofertas);
+- **Telegram** — Token do bot e Chat ID do grupo/canal (veja a seção
+  [Disparo](#disparo--por-que-não-há-whatsapp-automático)).
 
-Abra o arquivo `.env` no Bloco de Notas (ou TextEdit) e preencha o que
-tiver — as seções [Fontes](#fontes) e [Disparo](#disparo--por-que-não-há-whatsapp-automático)
-abaixo explicam onde conseguir cada credencial. Depois pare e inicie a
-aplicação de novo (passo 6) para ela ler o arquivo.
+Preencha o que tiver e clique em **Salvar** — vale na hora, sem precisar
+reiniciar a aplicação. As credenciais ficam guardadas só neste
+computador, em `data/settings.json`, e nunca saem daqui. Da próxima vez
+que abrir o painel, os campos de senha aparecem em branco por segurança
+(mas o selo "✅ configurado" confirma que o valor continua salvo) — deixar
+um campo em branco ao salvar sempre preserva o que já estava lá.
+
+Quem preferir editar um arquivo em vez de usar o painel também pode: copie
+`.env.example` para `.env` e preencha lá (`cp .env.example .env` no
+macOS/Linux, `copy .env.example .env` no Windows/PowerShell). O `.env` só
+é lido quando a aplicação inicia, então nesse caso é preciso reiniciar
+(passo 6) depois de editar. O painel tem prioridade: o que for salvo por
+ele sobrepõe o que estiver no `.env`.
 
 ### Problemas comuns
 
@@ -134,6 +146,9 @@ desabilitado — sem API aberta de afiliados — e a mensagem sai marcada com
 "link comum". Tudo que foi copiado/enviado alimenta o dedupe e aparece como
 "já enviado" nas próximas buscas.
 
+O botão **⚙️ Configurações** abre o painel de credenciais (Shopee,
+Mercado Livre e Telegram) — ver o passo 7 do guia acima para detalhes.
+
 ### Hospedagem estática (opcional)
 
 A mesma página também funciona hospedada como site estático, sem o
@@ -153,6 +168,8 @@ API JSON usada pela página (útil para integrar outra UI):
 | `POST /api/shortlink` | `{source, originUrl, subIds}` → shortlink Shopee |
 | `POST /api/share/telegram` | `{offers}` → envia via Bot API e marca no dedupe |
 | `POST /api/mark-sent` | `{offers}` → alimenta o dedupe no fluxo semiautomático |
+| `GET /api/settings` | status das credenciais (nunca devolve os segredos, só se estão configurados) |
+| `POST /api/settings` | `{shopeeAppId, shopeeAppSecret, meliAccessToken, telegramBotToken, telegramChatId}` → salva; campo em branco preserva o valor atual |
 
 ### Score de potencial de venda
 
@@ -198,7 +215,11 @@ coleta, ranking ou dedupe. Se ainda assim optar por um cliente não oficial
 de WhatsApp, use um número descartável e trate o banimento como custo
 esperado.
 
-## Uso
+## Uso (CLI)
+
+O CLI lê credenciais do `.env` (não usa o painel de Configurações, que é
+específico da interface web) — copie `.env.example` para `.env` e
+preencha o que tiver:
 
 ```bash
 cp .env.example .env   # preencha as credenciais que tiver
@@ -230,7 +251,8 @@ public/
 src/
   index.js              # CLI / orquestração do pipeline
   server.js             # servidor HTTP + API JSON da interface web
-  config.js             # .env → config tipada
+  config.js             # .env → config tipada, com override em memória
+  settings-store.js     # painel de Configurações: persiste em data/settings.json
   offer.js              # formato normalizado de oferta
   score.js              # ranking de potencial de venda
   store.js              # dedupe em SQLite (node:sqlite)

@@ -9,6 +9,9 @@ import { formatOfferMessage } from './format.js';
 import { createDispatcher } from './dispatch/index.js';
 import { createSource } from './sources/index.js';
 import { ShopeeSource } from './sources/shopee.js';
+import { loadPersistedSettings, saveSettings, settingsStatus } from './settings-store.js';
+
+loadPersistedSettings();
 
 const PUBLIC_DIR = fileURLToPath(new URL('../public', import.meta.url));
 const MIME = {
@@ -109,6 +112,26 @@ async function handleMarkSent(req, res) {
   json(res, 200, { marked: offers.length });
 }
 
+/**
+ * GET /api/settings
+ * Status das credenciais para a UI — nunca devolve os segredos, só se
+ * estão preenchidos (e o App ID / Chat ID, que não são sensíveis).
+ */
+async function handleGetSettings(res) {
+  json(res, 200, settingsStatus());
+}
+
+/**
+ * POST /api/settings {shopeeAppId, shopeeAppSecret, meliAccessToken, telegramBotToken, telegramChatId}
+ * Aplica em memória e persiste em data/settings.json. Campos de senha
+ * enviados em branco preservam o valor já salvo (ver applySettings).
+ */
+async function handlePostSettings(req, res) {
+  const body = await readJsonBody(req);
+  saveSettings(body);
+  json(res, 200, settingsStatus());
+}
+
 async function handleStatic(url, res) {
   const path = url.pathname === '/' ? '/index.html' : url.pathname;
   const file = normalize(join(PUBLIC_DIR, path));
@@ -141,6 +164,12 @@ export const server = createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/mark-sent') {
       return await handleMarkSent(req, res);
+    }
+    if (req.method === 'GET' && url.pathname === '/api/settings') {
+      return await handleGetSettings(res);
+    }
+    if (req.method === 'POST' && url.pathname === '/api/settings') {
+      return await handlePostSettings(req, res);
     }
     if (req.method === 'GET') {
       return await handleStatic(url, res);

@@ -33,6 +33,7 @@
   header {
     padding: 20px 24px 0; max-width: 1100px; margin: 0 auto;
   }
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
   header h1 { margin: 0; font-size: 22px; }
   header h1 span { color: var(--accent); }
   header p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
@@ -134,13 +135,44 @@
   #toast.error { background: var(--danger); color: #fff; }
 
   .empty { text-align: center; color: var(--muted); padding: 48px 24px; grid-column: 1 / -1; }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(10, 14, 18, .55);
+    display: none; align-items: flex-start; justify-content: center;
+    padding: 40px 16px; overflow-y: auto; z-index: 20;
+  }
+  .overlay.visible { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; width: 100%; max-width: 460px;
+    box-shadow: var(--shadow);
+  }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .modal-header h2 { margin: 0; font-size: 17px; }
+  .modal-header button { padding: 4px 10px; }
+  .modal-note { color: var(--muted); font-size: 13px; margin: 4px 0 16px; }
+  .modal fieldset {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px 12px; margin: 0 0 12px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .modal legend { padding: 0 4px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .modal .field { width: 100%; }
+  .modal .field input { width: 100%; }
+  .modal .hint { font-size: 12px; color: var(--muted); margin: 0; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>IQ<span>links</span></h1>
-  <p>Anúncios com maior potencial de venda, prontos para compartilhar com seu link de afiliado.</p>
+  <div class="header-row">
+    <div>
+      <h1>IQ<span>links</span></h1>
+      <p>Anúncios com maior potencial de venda, prontos para compartilhar com seu link de afiliado.</p>
+    </div>
+    <button type="button" id="openSettings">⚙️ Configurações</button>
+  </div>
 </header>
 
 <div class="toolbar">
@@ -184,6 +216,57 @@
 </div>
 
 <div id="toast"></div>
+
+<div id="settingsOverlay" class="overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Configurações</h2>
+      <button type="button" id="closeSettings" aria-label="Fechar">✕</button>
+    </div>
+    <p class="modal-note">
+      Fica salvo só neste computador — nunca é enviado para fora. Deixe um
+      campo em branco para manter o valor já salvo.
+    </p>
+    <form id="settingsForm">
+      <fieldset id="shopeeFields">
+        <legend>Shopee <span class="badge plain" id="shopeeStatus"></span></legend>
+        <div class="field">
+          <label for="setShopeeAppId">App ID</label>
+          <input id="setShopeeAppId" name="shopeeAppId" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="setShopeeAppSecret">App Secret</label>
+          <input id="setShopeeAppSecret" name="shopeeAppSecret" type="password" autocomplete="off">
+        </div>
+        <p class="hint">Painel de afiliados Shopee → Open API (aprovação em ~5–15 dias).</p>
+      </fieldset>
+      <fieldset id="meliFields">
+        <legend>Mercado Livre <span class="badge plain" id="meliStatus"></span></legend>
+        <div class="field">
+          <label for="setMeliToken">Access Token (opcional)</label>
+          <input id="setMeliToken" name="meliAccessToken" type="password" autocomplete="off">
+        </div>
+        <p class="hint">Não é necessário para buscar ofertas — só aumenta o limite de requisições.</p>
+      </fieldset>
+      <fieldset>
+        <legend>Telegram <span class="badge plain" id="telegramStatus"></span></legend>
+        <div class="field">
+          <label for="setTgToken">Token do bot</label>
+          <input id="setTgToken" name="telegramBotToken" type="password" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="setTgChat">Chat ID do grupo/canal</label>
+          <input id="setTgChat" name="telegramChatId" placeholder="ex.: -1001234567890" autocomplete="off">
+        </div>
+        <p class="hint">Crie um bot com @BotFather, adicione-o ao grupo e use o chat_id (grupos são negativos).</p>
+      </fieldset>
+      <div class="modal-actions">
+        <button type="button" id="cancelSettings">Cancelar</button>
+        <button type="submit" class="primary">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <script type="module">
 const $ = (id) => document.getElementById(id);
@@ -245,16 +328,11 @@ function markSentLocal(list) {
 }
 
 function getTelegramConfig() {
-  let cfg = null;
-  try { cfg = JSON.parse(localStorage.getItem('iqlinks-tg')); } catch {}
-  if (cfg?.botToken && cfg?.chatId) return cfg;
-  const botToken = prompt('Token do bot do Telegram (fica salvo apenas neste navegador):');
-  if (!botToken) return null;
-  const chatId = prompt('Chat ID do grupo/canal (ex.: -1001234567890):');
-  if (!chatId) return null;
-  cfg = { botToken: botToken.trim(), chatId: chatId.trim() };
-  localStorage.setItem('iqlinks-tg', JSON.stringify(cfg));
-  return cfg;
+  try {
+    const cfg = JSON.parse(localStorage.getItem('iqlinks-tg'));
+    if (cfg?.botToken && cfg?.chatId) return cfg;
+  } catch {}
+  return null;
 }
 
 const backend = {
@@ -315,7 +393,7 @@ const backend = {
     }
     const { TelegramDispatcher, formatOfferMessage } = await loadLib();
     const cfg = getTelegramConfig();
-    if (!cfg) throw new Error('Envio cancelado: informe token e chat ID do bot.');
+    if (!cfg) throw new Error('Configure o bot do Telegram em ⚙️ Configurações antes de enviar.');
     const dispatcher = new TelegramDispatcher(cfg);
     await dispatcher.send(list.map(formatOfferMessage));
     return { sent: list.length };
@@ -538,6 +616,76 @@ $('telegram').addEventListener('click', async () => {
   }
 });
 
+function applySettingsStatus(status) {
+  $('setShopeeAppId').value = status.shopeeAppId ?? '';
+  $('shopeeStatus').textContent = status.shopeeAppSecretSet ? '✅ configurado' : 'não configurado';
+  $('meliStatus').textContent = status.meliAccessTokenSet ? '✅ configurado' : 'opcional';
+  $('setTgChat').value = status.telegramChatId ?? '';
+  $('telegramStatus').textContent = status.telegramBotTokenSet ? '✅ configurado' : 'não configurado';
+}
+
+async function openSettings() {
+  $('settingsForm').reset();
+  if (mode === 'server') {
+    try {
+      applySettingsStatus(await api('api/settings'));
+    } catch (err) {
+      toast(err.message, true);
+    }
+  } else {
+    let cfg = null;
+    try { cfg = JSON.parse(localStorage.getItem('iqlinks-tg')); } catch {}
+    applySettingsStatus({
+      shopeeAppId: '',
+      shopeeAppSecretSet: false,
+      meliAccessTokenSet: false,
+      telegramChatId: cfg?.chatId ?? '',
+      telegramBotTokenSet: Boolean(cfg?.botToken),
+    });
+  }
+  $('settingsOverlay').classList.add('visible');
+}
+
+function closeSettings() {
+  $('settingsOverlay').classList.remove('visible');
+}
+
+$('openSettings').addEventListener('click', openSettings);
+$('closeSettings').addEventListener('click', closeSettings);
+$('cancelSettings').addEventListener('click', closeSettings);
+$('settingsOverlay').addEventListener('click', (ev) => {
+  if (ev.target === $('settingsOverlay')) closeSettings();
+});
+
+$('settingsForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const payload = Object.fromEntries(new FormData(ev.target).entries());
+  const btn = ev.submitter;
+  btn.disabled = true;
+  try {
+    if (mode === 'server') {
+      applySettingsStatus(await api('api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }));
+    } else if (payload.telegramBotToken || payload.telegramChatId) {
+      let cfg = null;
+      try { cfg = JSON.parse(localStorage.getItem('iqlinks-tg')); } catch {}
+      localStorage.setItem('iqlinks-tg', JSON.stringify({
+        botToken: payload.telegramBotToken || cfg?.botToken || '',
+        chatId: payload.telegramChatId || cfg?.chatId || '',
+      }));
+    }
+    toast('Configurações salvas.');
+    closeSettings();
+  } catch (err) {
+    toast(err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 mode = await detectMode();
 if (mode === 'static') {
   $('status').textContent =
@@ -546,6 +694,8 @@ if (mode === 'static') {
   const opt = $('source').querySelector('option[value=shopee]');
   opt.disabled = true;
   opt.textContent = 'Shopee (requer servidor)';
+  $('shopeeFields').style.display = 'none';
+  $('meliFields').style.display = 'none';
 }
 </script>
 </body>

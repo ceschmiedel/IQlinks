@@ -38,3 +38,24 @@ export const config = {
   },
   dbPath: process.env.DB_PATH ?? 'data/iqlinks.db',
 };
+
+const SETTABLE_FIELDS = {
+  shopeeAppId: (v) => (config.shopee.appId = v),
+  shopeeAppSecret: (v) => (config.shopee.appSecret = v),
+  meliAccessToken: (v) => (config.meli.accessToken = v),
+  telegramBotToken: (v) => (config.telegram.botToken = v),
+  telegramChatId: (v) => (config.telegram.chatId = v),
+};
+
+/**
+ * Sobrescreve credenciais em memória a partir do painel de Configurações
+ * da interface web. Um campo em branco sempre preserva o valor atual —
+ * assim o usuário não precisa redigitar segredos que já salvou, e não
+ * corre o risco de apagar um por engano ao salvar outro.
+ */
+export function applySettings(settings = {}) {
+  for (const [key, apply] of Object.entries(SETTABLE_FIELDS)) {
+    const value = settings[key];
+    if (typeof value === 'string' && value.trim()) apply(value.trim());
+  }
+}
